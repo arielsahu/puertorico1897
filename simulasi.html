@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Simulasi Puerto Rico 1897 (Bot vs Bot)</title>
+<style>
+  :root {
+    --corn: #e0c341;
+    --fruit: #6ab04c;
+    --sugar: #e8e2d0;
+    --tobacco: #8a5a34;
+    --coffee: #3b2a1a;
+  }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 20px 60px;
+    line-height: 1.5;
+    color: #2b2013;
+    background: #faf3e6;
+  }
+  h1 {
+    font-size: 1.6em;
+    border-bottom: 3px solid #b8860b;
+    padding-bottom: 8px;
+    color: #6b3e17;
+  }
+  .note {
+    font-size: 0.85em;
+    color: #7a6b4f;
+    background: #f1e6cc;
+    border-left: 4px solid #b8860b;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  button {
+    background: #b8860b;
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    font-size: 0.95em;
+    cursor: pointer;
+  }
+  button:hover { background: #8a5a1f; }
+  button:disabled { background: #ccc; cursor: not-allowed; }
+  #roundLabel {
+    font-weight: bold;
+    color: #6b3e17;
+  }
+  .role-track {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .role-card {
+    background: #fff;
+    border: 2px solid #d8c6a3;
+    border-radius: 6px;
+    padding: 8px 12px;
+    min-width: 100px;
+    text-align: center;
+    font-size: 0.85em;
+  }
+  .role-card.used {
+    background: #eee0c4;
+    border-color: #b8860b;
+  }
+  .role-card .rname { font-weight: bold; color: #6b3e17; }
+  .role-card .rowner { font-size: 0.8em; color: #8a5a1f; }
+  .role-card .rbonus { font-size: 0.8em; color: #a04; }
+
+  .players-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .player-card {
+    background: #fff;
+    border: 2px solid #d8c6a3;
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .player-card.governor { border-color: #b8860b; box-shadow: 0 0 0 2px #f1d78c; }
+  .player-card h3 {
+    margin: 0 0 6px;
+    color: #6b3e17;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9em;
+    margin: 2px 0;
+  }
+  .goods-bars { margin-top: 8px; }
+  .goods-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78em;
+    margin: 2px 0;
+  }
+  .goods-label { width: 55px; }
+  .goods-swatch {
+    width: 12px; height: 12px; border-radius: 3px; border: 1px solid #999;
+    flex-shrink: 0;
+  }
+  .goods-count { font-weight: bold; }
+  .build-info {
+    margin-top: 8px;
+    font-size: 0.75em;
+    color: #7a6b4f;
+  }
+
+  #log {
+    background: #fff;
+    border: 1px solid #d8c6a3;
+    border-radius: 6px;
+    padding: 10px 14px;
+    height: 260px;
+    overflow-y: auto;
+    font-size: 0.85em;
+  }
+  #log .entry { margin-bottom: 4px; }
+  #log .round-sep {
+    font-weight: bold;
+    color: #6b3e17;
+    margin-top: 10px;
+    border-top: 1px dashed #cbb98a;
+    padding-top: 6px;
+  }
+
+  #finalScore {
+    display: none;
+    margin-top: 20px;
+    background: #fff8e6;
+    border: 2px solid #b8860b;
+    border-radius: 8px;
+    padding: 14px 18px;
+  }
+  #finalScore table { width: 100%; border-collapse: collapse; }
+  #finalScore th, #finalScore td { padding: 6px 10px; border-bottom: 1px solid #e0d3ab; text-align: left; }
+  #finalScore tr.winner { background: #fdeec0; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>Simulasi Puerto Rico 1897 — Bot vs Bot</h1>
+<p class="note">
+  Ini simulasi <strong>disederhanakan</strong> untuk 4 pemain (AI vs AI): hanya 5 role dasar (Planter, Craftsman, Trader, Captain, Builder),
+  tanpa detail worker/semicircle/quarry/building spesial. Nilai shipping selalu 1 VP/barel untuk semua jenis barang (sesuai rulebook resmi),
+  sedangkan nilai jual (Trader) berbeda per barang. Simulasi berhenti otomatis di ronde ke-12.
+</p>
+
+<div class="controls">
+  <button id="btnNext">Next Round</button>
+  <button id="btnPlay">Play All (auto)</button>
+  <button id="btnReset">Reset</button>
+  <span id="roundLabel">Ronde: 0 / 12</span>
+</div>
+
+<div class="role-track" id="roleTrack"></div>
+<div class="players-grid" id="playersGrid"></div>
+
+<h3>Log Permainan</h3>
+<div id="log"></div>
+
+<div id="finalScore">
+  <h3>Hasil Akhir</h3>
+  <table id="finalTable"></table>
+</div>
+
+<script>
+const GOODS = ['corn','fruit','sugar','tobacco','coffee'];
+const GOODS_LABEL = { corn:'Corn', fruit:'Fruit', sugar:'Sugar', tobacco:'Tobacco', coffee:'Coffee' };
+const GOODS_VALUE = { corn:0, fruit:1, sugar:2, tobacco:3, coffee:4 };
+const ROLES = ['Planter','Craftsman','Trader','Captain','Builder'];
+const MAX_ROUNDS = 12;
+const SHIP_CAPACITY = [4,5,6];
+
+let state = null;
+
+function freshGoods() { return { corn:0, fruit:0, sugar:0, tobacco:0, coffee:0 }; }
+function freshPlantations() { return { corn:0, fruit:0, sugar:0, tobacco:0, coffee:0 }; }
+function freshBuildings() { return { fruit:0, sugar:0, tobacco:0, coffee:0 }; }
+
+function initState() {
+  const players = [];
+  for (let i = 0; i < 4; i++) {
+    players.push({
+      name: 'Player ' + (i + 1),
+      coins: 2,
+      vp: 0,
+      goods: freshGoods(),
+      plantations: freshPlantations(),
+      buildings: freshBuildings()
+    });
+  }
+  // starting plantation: 2 fruit, 2 corn (mirrors official 4-player setup)
+  players[0].plantations.fruit = 1;
+  players[1].plantations.fruit = 1;
+  players[2].plantations.corn = 1;
+  players[3].plantations.corn = 1;
+
+  return {
+    players,
+    round: 0,
+    governorIndex: 0,
+    roleBonus: { Planter:0, Craftsman:0, Trader:0, Captain:0, Builder:0 },
+    tradingHouse: {}, // good -> true if occupied this cycle
+    ships: SHIP_CAPACITY.map(cap => ({ cap, good: null, loaded: 0 })),
+    log: [],
+    finished: false
+  };
+}
+
+function log(msg, isRoundSep) {
+  state.log.push({ msg, isRoundSep: !!isRoundSep });
+}
+
+function activePlantation(player, good) {
+  if (good === 'corn') return player.plantations.corn;
+  return Math.min(player.plantations[good], player.buildings[good] || 0);
+}
+
+// --- Role actions ---
+
+function doPlanter(player, isChooser) {
+  // pick good with fewest plantations, prefer higher value
+  let best = GOODS[0], bestScore = -Infinity;
+  for (const g of GOODS) {
+    const score = GOODS_VALUE[g] - player.plantations[g] * 2;
+    if (score > bestScore) { bestScore = score; best = g; }
+  }
+  player.plantations[best]++;
+  const tag = isChooser ? ' (pemilih role)' : '';
+  log(`&nbsp;&nbsp;${player.name}${tag}: dapat 1 plantation ${GOODS_LABEL[best]}.`);
+}
+
+function doBuilder(player, isChooser) {
+  // buy building for a good with plantation but no building
+  let target = null;
+  for (const g of ['coffee','tobacco','sugar','fruit']) {
+    if (player.plantations[g] > (player.buildings[g] || 0)) { target = g; break; }
+  }
+  const tag = isChooser ? ' (pemilih role)' : '';
+  if (!target) { log(`&nbsp;&nbsp;${player.name}${tag}: tidak ada building yang perlu dibeli.`); return; }
+  let cost = GOODS_VALUE[target] + 1;
+  if (isChooser) cost = Math.max(0, cost - 1); // advantage: 1 coin less
+  if (player.coins < cost) { log(`&nbsp;&nbsp;${player.name}${tag}: dana tidak cukup untuk building ${GOODS_LABEL[target]} (butuh ${cost}).`); return; }
+  player.coins -= cost;
+  player.buildings[target] = (player.buildings[target] || 0) + 1;
+  log(`&nbsp;&nbsp;${player.name}${tag}: beli building ${GOODS_LABEL[target]} seharga ${cost} coin.`);
+}
+
+function doCraftsman(player, isChooser) {
+  const produced = [];
+  for (const g of GOODS) {
+    const n = activePlantation(player, g);
+    if (n > 0) { player.goods[g] += n; produced.push(`${n} ${GOODS_LABEL[g]}`); }
+  }
+  if (isChooser && produced.length) {
+    // advantage: 1 extra barrel of a produced good
+    const g = GOODS.find(g => activePlantation(player, g) > 0);
+    if (g) { player.goods[g]++; produced.push(`+1 ${GOODS_LABEL[g]} (advantage)`); }
+  }
+  const tag = isChooser ? ' (pemilih role)' : '';
+  log(`&nbsp;&nbsp;${player.name}${tag}: produksi ${produced.length ? produced.join(', ') : 'tidak ada'}.`);
+}
+
+function doTrader(player, tradingHouse, isChooser) {
+  // sell highest-value good not already in trading house this cycle
+  let best = null;
+  for (const g of [...GOODS].sort((a,b) => GOODS_VALUE[b]-GOODS_VALUE[a])) {
+    if (player.goods[g] > 0 && !tradingHouse[g]) { best = g; break; }
+  }
+  const tag = isChooser ? ' (pemilih role)' : '';
+  if (!best) { log(`&nbsp;&nbsp;${player.name}${tag}: tidak ada barang yang bisa dijual.`); return; }
+  player.goods[best]--;
+  let gain = GOODS_VALUE[best];
+  if (isChooser) gain += 1; // advantage: 1 extra coin
+  player.coins += gain;
+  tradingHouse[best] = true;
+  log(`&nbsp;&nbsp;${player.name}${tag}: jual 1 ${GOODS_LABEL[best]} untuk ${gain} coin.`);
+}
+
+function doCaptain(player, ships, isChooser) {
+  let totalVp = 0;
+  const actions = [];
+  let progress = true;
+  while (progress) {
+    progress = false;
+    // find good with most barrels
+    const candidates = GOODS.filter(g => player.goods[g] > 0);
+    candidates.sort((a,b) => player.goods[b] - player.goods[a]);
+    for (const g of candidates) {
+      // find ship carrying this good or empty ship with max capacity
+      let ship = ships.find(s => s.good === g && s.loaded < s.cap);
+      if (!ship) ship = ships.filter(s => s.good === null).sort((a,b)=>b.cap-a.cap)[0];
+      if (!ship) continue;
+      const space = ship.cap - ship.loaded;
+      const amount = Math.min(space, player.goods[g]);
+      if (amount <= 0) continue;
+      ship.good = g;
+      ship.loaded += amount;
+      player.goods[g] -= amount;
+      player.vp += amount;
+      totalVp += amount;
+      actions.push(`${amount} ${GOODS_LABEL[g]}`);
+      progress = true;
+      break;
+    }
+  }
+  if (isChooser && totalVp > 0) {
+    player.vp += 1; // advantage: 1 extra VP for loading
+    totalVp += 1;
+  }
+  const tag = isChooser ? ' (pemilih role)' : '';
+  if (actions.length) {
+    log(`&nbsp;&nbsp;${player.name}${tag}: kirim ${actions.join(', ')} (+${totalVp} VP).`);
+  } else {
+    log(`&nbsp;&nbsp;${player.name}${tag}: tidak ada barang yang bisa dikirim.`);
+  }
+  // storage rule: keep only 1 barrel type max 1 unit, forfeit rest
+  for (const g of GOODS) {
+    if (player.goods[g] > 1) player.goods[g] = 1;
+  }
+}
+
+// --- AI role scoring ---
+
+function scoreRole(role, player, tradingHouse) {
+  switch (role) {
+    case 'Planter':
+      return 3 + Math.random();
+    case 'Builder': {
+      let need = 0;
+      for (const g of ['coffee','tobacco','sugar','fruit']) {
+        if (player.plantations[g] > (player.buildings[g]||0)) need++;
+      }
+      return need > 0 ? 4 + need + Math.random() : 0.5 + Math.random();
+    }
+    case 'Craftsman': {
+      let total = 0;
+      for (const g of GOODS) total += activePlantation(player, g);
+      return total * 1.5 + Math.random();
+    }
+    case 'Trader': {
+      let sellable = GOODS.some(g => player.goods[g] > 0 && !tradingHouse[g]);
+      return sellable ? 3 + Math.random() : 0.3 + Math.random();
+    }
+    case 'Captain': {
+      let total = 0;
+      for (const g of GOODS) total += player.goods[g];
+      return total * 1.2 + Math.random();
+    }
+  }
+  return Math.random();
+}
+
+function chooseRole(player, availableRoles, tradingHouse) {
+  let best = availableRoles[0], bestScore = -1;
+  for (const r of availableRoles) {
+    const s = scoreRole(r, player, tradingHouse);
+    if (s > bestScore) { bestScore = s; best = r; }
+  }
+  return best;
+}
+
+function performRole(role, player, s, isChooser) {
+  if (role === 'Planter') doPlanter(player, isChooser);
+  else if (role === 'Builder') doBuilder(player, isChooser);
+  else if (role === 'Craftsman') doCraftsman(player, isChooser);
+  else if (role === 'Trader') doTrader(player, s.tradingHouse, isChooser);
+  else if (role === 'Captain') doCaptain(player, s.ships, isChooser);
+}
+
+function runRound() {
+  const s = state;
+  s.round++;
+  log(`Ronde ${s.round} — Governor: ${s.players[s.governorIndex].name}`, true);
+
+  let available = [...ROLES];
+  const order = [];
+  for (let i = 0; i < 4; i++) order.push((s.governorIndex + i) % 4);
+
+  for (const idx of order) {
+    if (available.length === 0) break;
+    const chooser = s.players[idx];
+    const role = chooseRole(chooser, available, s.tradingHouse);
+    available = available.filter(r => r !== role);
+    log(`${chooser.name} memilih role <strong>${role}</strong>:`);
+    // chooser performs first with advantage, then all other players clockwise perform the action without advantage
+    for (let k = 0; k < 4; k++) {
+      const pIdx = (idx + k) % 4;
+      performRole(role, s.players[pIdx], s, pIdx === idx);
+    }
+  }
+
+  // unchosen roles get bonus coin
+  for (const r of available) {
+    s.roleBonus[r] = (s.roleBonus[r] || 0) + 1;
+  }
+  // empty trading house & ships tracking handled at cycle boundaries (simplified: reset trading house each round)
+  s.tradingHouse = {};
+  // empty full ships
+  for (const ship of s.ships) {
+    if (ship.loaded >= ship.cap) { ship.good = null; ship.loaded = 0; }
+  }
+
+  s.governorIndex = (s.governorIndex + 1) % 4;
+
+  if (s.round >= MAX_ROUNDS) {
+    finishGame();
+  }
+}
+
+function finishGame() {
+  state.finished = true;
+  log(`Simulasi selesai setelah ${MAX_ROUNDS} ronde.`, true);
+}
+
+// --- Rendering ---
+
+function render() {
+  const s = state;
+  document.getElementById('roundLabel').textContent = `Ronde: ${s.round} / ${MAX_ROUNDS}`;
+
+  const roleTrack = document.getElementById('roleTrack');
+  roleTrack.innerHTML = '';
+  for (const r of ROLES) {
+    const div = document.createElement('div');
+    div.className = 'role-card';
+    div.innerHTML = `<div class="rname">${r}</div><div class="rbonus">Bonus: ${s.roleBonus[r] || 0} coin</div>`;
+    roleTrack.appendChild(div);
+  }
+
+  const grid = document.getElementById('playersGrid');
+  grid.innerHTML = '';
+  s.players.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'player-card' + (i === s.governorIndex && !s.finished ? ' governor' : '');
+    let goodsHtml = '';
+    for (const g of GOODS) {
+      goodsHtml += `<div class="goods-bar-row">
+        <span class="goods-swatch" style="background:var(--${g})"></span>
+        <span class="goods-label">${GOODS_LABEL[g]}</span>
+        <span class="goods-count">${p.goods[g]}</span>
+      </div>`;
+    }
+    div.innerHTML = `
+      <h3>${p.name} ${i === s.governorIndex && !s.finished ? '&#9819;' : ''}</h3>
+      <div class="stat-row"><span>Coins</span><span>${p.coins}</span></div>
+      <div class="stat-row"><span>VP</span><span>${p.vp}</span></div>
+      <div class="goods-bars">${goodsHtml}</div>
+      <div class="build-info">
+        Plantation: ${GOODS.map(g => `${GOODS_LABEL[g]}:${p.plantations[g]}`).join(' | ')}<br>
+        Building: ${['fruit','sugar','tobacco','coffee'].map(g => `${GOODS_LABEL[g]}:${p.buildings[g]||0}`).join(' | ')}
+      </div>
+    `;
+    grid.appendChild(div);
+  });
+
+  const logDiv = document.getElementById('log');
+  logDiv.innerHTML = s.log.map(e => `<div class="${e.isRoundSep ? 'round-sep' : 'entry'}">${e.msg}</div>`).join('');
+  logDiv.scrollTop = logDiv.scrollHeight;
+
+  document.getElementById('btnNext').disabled = s.finished;
+  document.getElementById('btnPlay').disabled = s.finished;
+
+  if (s.finished) {
+    const finalDiv = document.getElementById('finalScore');
+    finalDiv.style.display = 'block';
+    const sorted = [...s.players].sort((a,b) => b.vp - a.vp || (b.coins) - (a.coins));
+    const winnerVp = sorted[0].vp;
+    let html = '<tr><th>Peringkat</th><th>Pemain</th><th>VP</th><th>Coins</th></tr>';
+    sorted.forEach((p, i) => {
+      html += `<tr class="${p.vp === winnerVp && i === 0 ? 'winner' : ''}">
+        <td>${i+1}</td><td>${p.name}</td><td>${p.vp}</td><td>${p.coins}</td>
+      </tr>`;
+    });
+    document.getElementById('finalTable').innerHTML = html;
+  } else {
+    document.getElementById('finalScore').style.display = 'none';
+  }
+}
+
+// --- Controls ---
+
+let playing = false;
+
+function nextRound() {
+  if (state.finished) return;
+  runRound();
+  render();
+}
+
+function playAll() {
+  if (playing || state.finished) return;
+  playing = true;
+  const btn = document.getElementById('btnPlay');
+  btn.disabled = true;
+  const interval = setInterval(() => {
+    if (state.finished) {
+      clearInterval(interval);
+      playing = false;
+      return;
+    }
+    runRound();
+    render();
+  }, 500);
+}
+
+function resetGame() {
+  playing = false;
+  state = initState();
+  log('Simulasi baru dimulai untuk 4 pemain.', true);
+  render();
+}
+
+document.getElementById('btnNext').addEventListener('click', nextRound);
+document.getElementById('btnPlay').addEventListener('click', playAll);
+document.getElementById('btnReset').addEventListener('click', resetGame);
+
+resetGame();
+</script>
+
+</body>
+</html>
